@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Einstellungen -->
+        <TextView
+            style="@android:style/TextAppearance.Material.Subhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Einstellungen"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Verbindung messen alle … s" />
+            <EditText
+                android:id="@+id/etConn"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:maxLength="4" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Umgebung scannen alle … s (≥ 30 empfohlen)" />
+            <EditText
+                android:id="@+id/etScan"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:maxLength="4" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Ping-Ziel Internet" />
+            <EditText
+                android:id="@+id/etTarget"
+                android:layout_width="160dp"
+                android:layout_height="wrap_content"
+                android:inputType="textUri" />
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/cbPing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ping messen (Router + Internet)" />
+
+        <Button
+            android:id="@+id/btnToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnScan"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Jetzt scannen" />
+
+        <!-- Live-Daten -->
+        <TextView
+            style="@android:style/TextAppearance.Material.Subhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Aktuelle Verbindung"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvConn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@android:style/TextAppearance.Material.Subhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Umgebung (letzter Scan)"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvScan"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="11sp" />
+
+        <TextView
+            style="@android:style/TextAppearance.Material.Subhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Ereignisse"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvEvents"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="11sp" />
+
+        <!-- Export -->
+        <TextView
+            style="@android:style/TextAppearance.Material.Subhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Daten"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvStore"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnShareJson"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="JSON teilen (für Claude)" />
+        <Button
+            android:id="@+id/btnSaveJson"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="JSON speichern …" />
+        <Button
+            android:id="@+id/btnShareCsv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CSV teilen (3 Dateien)" />
+        <Button
+            android:id="@+id/btnClear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Alle Daten löschen" />
+    </LinearLayout>
+</ScrollView>

@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.SystemClock
 import org.json.JSONObject
 import java.net.Inet4Address
-import java.util.concurrent.TimeUnit
 
 /** Liest Rohwerte aus WifiManager / ConnectivityManager und misst Ping. */
 @SuppressLint("MissingPermission")
@@ -132,21 +131,5 @@ class WifiCollector(ctx: Context) {
         return o
     }
 
-    private val timeRegex = Regex("time[=<]([0-9]+(?:\\.[0-9]+)?)")
-
-    /** Ein ICMP-Echo über das System-ping. Rückgabe: RTT in ms oder null. */
-    fun ping(host: String, timeoutSec: Int = 2): Double? = try {
-        val p = ProcessBuilder("/system/bin/ping", "-c", "1", "-W", timeoutSec.toString(), host)
-            .redirectErrorStream(true)
-            .start()
-        val out = p.inputStream.bufferedReader().use { it.readText() }
-        if (!p.waitFor(timeoutSec + 2L, TimeUnit.SECONDS)) {
-            p.destroy()
-            null
-        } else {
-            timeRegex.find(out)?.groupValues?.get(1)?.toDoubleOrNull()?.let { Util.round1(it) }
-        }
-    } catch (e: Exception) {
-        null
-    }
+    fun ping(host: String, timeoutSec: Int = 2): Double? = Net.ping(host, timeoutSec)
 }

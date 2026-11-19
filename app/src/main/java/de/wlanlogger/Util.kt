@@ -76,3 +76,30 @@ object Util {
         else -> "$b B"
     }
 }
+
+/** ICMP über das System-ping (funktioniert ohne Root). */
+object Net {
+    private val timeRegex = Regex("time[=<]([0-9]+(?:\\.[0-9]+)?)")
+    private val recvRegex = Regex("([0-9]+) (?:packets )?received")
+
+    class PingResult(val sent: Int, val received: Int, val times: List<Double>)
+
+    /** Ein Echo. Rückgabe: RTT in ms oder null (Timeout). */
+    fun ping(host: String, timeoutSec: Int = 2): Double? =
+        pingStats(host, 1, timeoutSec).times.firstOrNull()
+
+    /** [count] Echos im Abstand von 0,2 s (Minimum ohne Root). */
+    fun pingStats(host: String, count: Int, timeoutSec: Int = 1): PingResult = try {
+        val args = mutableListOf("/system/bin/ping", "-c", count.toString(), "-W", timeoutSec.toString())
+        if (count > 1) args += listOf("-i", "0.2")
+        args += host
+        val p = ProcessBuilder(args).redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().use { it.readText() }
+        if (!p.waitFor(timeoutSec + count + 3L, java.util.concurrent.TimeUnit.SECONDS)) p.destroy()
+        val times = timeRegex.findAll(out).mapNotNull { it.groupValues[1].toDoubleOrNull() }.map { Util.round1(it) }.toList()
+        val recv = recvRegex.find(out)?.groupValues?.get(1)?.toIntOrNull() ?: times.size
+        PingResult(count, recv, times)
+    } catch (e: Exception) {
+        PingResult(count, 0, emptyList())
+    }
+}

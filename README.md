@@ -14,6 +14,14 @@ Ping zum Router und zu einem Internet-Ziel (Standard 1.1.1.1).
 Alle sichtbaren Access Points mit SSID, BSSID, RSSI, Frequenz, Kanal, Kanalbreite,
 Mittenfrequenzen, Sicherheit, Capabilities, WLAN-Standard.
 
+**Heimnetz-Geräte** (auf Knopfdruck und beim Logging alle 10 min):
+Alle Geräte im eigenen Subnetz per Ping-Sweep + TCP-Probe, dazu pro Gerät:
+Ping-Latenz/-Verlust (5 Echos), offene Ports (22 typische Dienste), Hostname vom
+Router (Reverse-DNS), NetBIOS-Name + MAC (Windows/NAS), mDNS/Bonjour-Dienste
+(Apple, Chromecast, Drucker, HomeKit, Sonos …), SSDP/UPnP (Hersteller, Modell)
+und eine Typ-Schätzung. Zwischen zwei Scans werden neue und verschwundene Geräte
+als Ereignis geloggt.
+
 **Ereignisse:** WLAN verbunden/verloren, Internet weg/wieder da, Roaming
 (BSSID-Wechsel), gedrosselte Scans, Fehler.
 
@@ -38,6 +46,10 @@ Mittenfrequenzen, Sicherheit, Capabilities, WLAN-Standard.
 - **Scan-Drosselung:** Android erlaubt Apps ca. 4 Scans pro 2 Minuten. Abschaltbar
   unter *Entwickleroptionen → WLAN-Scan-Drosselung*.
 - **Standort muss eingeschaltet sein**, sonst sind Scan-Ergebnisse leer und die SSID unbekannt.
+- **Kein Datenverkehr anderer Geräte:** Wer wie viel Traffic erzeugt, sieht nur der
+  Router (z. B. FRITZ!Box: *Heimnetz → Netzwerk*, *System → Ereignisse*,
+  Paketmitschnitt unter `http://fritz.box/html/capture.lua`).
+- **MAC-Adressen:** Android 10+ sperrt die ARP-Tabelle; MACs gibt es nur über NetBIOS.
 - **Keine 802.11-Rohpakete:** Monitor-Mode/Paketmitschnitt ist ohne Root auf Android nicht möglich.
 - **Akku:** Dauer-Logging hält die CPU wach. Manche Hersteller (Xiaomi, Huawei, Samsung)
   beenden Hintergrunddienste trotzdem → App in den Akku-Einstellungen auf „Nicht optimieren“ setzen.

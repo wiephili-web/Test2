@@ -28,10 +28,18 @@ object Exporter {
         "wifi_standard", "age_ms", "connected",
     )
 
+    val DEVICE_COLS = listOf(
+        "device_scan_id", "ts", "time", "ip", "role", "type_guess", "hostname", "netbios_name", "mac",
+        "ping_sent", "ping_recv", "ping_loss_pct", "ping_avg_ms", "ping_max_ms", "open_ports",
+        "discovered_via", "mdns_names", "mdns_services", "mdns_txt", "ssdp_server", "upnp_name",
+        "upnp_manufacturer", "upnp_model", "upnp_device_type", "scan_prefix", "scan_duration_s",
+    )
+
     private class Snapshot(dir: File) {
         val conn = File(dir, "connection.jsonl")
         val scan = File(dir, "scans.jsonl")
         val events = File(dir, "events.jsonl")
+        val devices = File(dir, "devices.jsonl")
     }
 
     private fun exportDir(ctx: Context) = File(ctx.cacheDir, "exports").apply { mkdirs() }
@@ -72,6 +80,7 @@ object Exporter {
             writeArray(w, "connection", snap.conn)
             writeArray(w, "scans", snap.scan)
             writeArray(w, "events", snap.events)
+            writeArray(w, "devices", snap.devices)
             w.write("\n}\n")
         }
         return out
@@ -122,7 +131,8 @@ object Exporter {
                     .put("down_kbps/up_kbps", "Bandbreitenschätzung von Android, grob")
                     .put("scans.age_ms", "Alter des Scan-Eintrags; große Werte = Ergebnis aus Cache")
                     .put("scans.scan_id", "gleiche ID = gleicher Scan-Durchlauf")
-                    .put("events.type", "wifi_connected, wifi_lost, internet_lost, internet_restored, roam, scan_rejected_throttled, logging_started/stopped, error")
+                    .put("events.type", "wifi_connected, wifi_lost, internet_lost, internet_restored, roam, device_scan, device_new, device_gone, scan_rejected_throttled, logging_started/stopped, error")
+                    .put("devices", "Heimnetz-Geräte je Geräte-Scan (gleiche device_scan_id = gleicher Scan). ping_* = 5 Echos pro Gerät; viele Geräte (iPhone, Windows) blocken Ping, dann 100 % Verlust ohne Problem. type_guess ist eine Heuristik. MAC meist leer, weil Android 10+ die ARP-Tabelle sperrt.")
             )
     }
 
@@ -262,6 +272,72 @@ object Exporter {
             .put("connection", conn)
             .put("environment", scans)
             .put("event_counts", JSONObject(counts as Map<*, *>))
+            .put("devices", summarizeDevices(snap.devices))
+    }
+
+    private class DevAgg(val ip: String) {
+        val scans = HashSet<Long>()
+        val names = LinkedHashSet<String>()
+        val types = LinkedHashSet<String>()
+        val macs = LinkedHashSet<String>()
+        val ports = LinkedHashSet<String>()
+        val pingAvg = Stats()
+        var pingSent = 0
+        var pingRecv = 0
+        var pingMax = 0.0
+        var role: String? = null
+        var firstTs = Long.MAX_VALUE
+        var lastTs = 0L
+    }
+
+    private fun summarizeDevices(f: File): JSONObject {
+        val all = HashSet<Long>()
+        val agg = LinkedHashMap<String, DevAgg>()
+        forEachJson(f) { o ->
+            val id = o.optLong("device_scan_id")
+            all.add(id)
+            val ip = o.optString("ip")
+            val a = agg.getOrPut(ip) { DevAgg(ip) }
+            a.scans.add(id)
+            val ts = o.optLong("ts")
+            if (ts < a.firstTs) a.firstTs = ts
+            if (ts > a.lastTs) a.lastTs = ts
+            if (!o.isNull("role")) a.role = o.getString("role")
+            for (k in listOf("upnp_name", "hostname", "netbios_name", "mdns_names")) {
+                if (!o.isNull(k)) o.getString(k).split(" | ").filter { it.isNotBlank() }.forEach { if (a.names.size < 8) a.names.add(it) }
+            }
+            if (!o.isNull("type_guess")) a.types.add(o.getString("type_guess"))
+            if (!o.isNull("mac")) a.macs.add(o.getString("mac"))
+            o.optString("open_ports").split(" ").filter { it.isNotBlank() }.forEach { a.ports.add(it) }
+            a.pingSent += o.optInt("ping_sent")
+            a.pingRecv += o.optInt("ping_recv")
+            if (!o.isNull("ping_avg_ms")) a.pingAvg.add(o.getDouble("ping_avg_ms"))
+            if (!o.isNull("ping_max_ms")) a.pingMax = maxOf(a.pingMax, o.getDouble("ping_max_ms"))
+        }
+        val list = JSONArray()
+        agg.values.sortedBy { v -> v.ip.split('.').fold(0L) { acc, p -> acc * 256 + (p.toLongOrNull() ?: 0L) } }.forEach { a ->
+            list.put(
+                JSONObject()
+                    .put("ip", a.ip)
+                    .putN("role", a.role)
+                    .put("names", JSONArray(a.names.toList()))
+                    .put("type_guesses", JSONArray(a.types.toList()))
+                    .put("macs", JSONArray(a.macs.toList()))
+                    .put("open_ports", JSONArray(a.ports.toList()))
+                    .put("seen_in_scans", a.scans.size)
+                    .put("seen_pct", if (all.isEmpty()) 0.0 else Util.round1(100.0 * a.scans.size / all.size))
+                    .put("first_seen", Util.iso(a.firstTs))
+                    .put("last_seen", Util.iso(a.lastTs))
+                    .put("ping_loss_pct", if (a.pingSent == 0) JSONObject.NULL else Util.round1(100.0 * (a.pingSent - a.pingRecv) / a.pingSent))
+                    .put("ping_avg_ms", a.pingAvg.toJson())
+                    .put("ping_max_ms", a.pingMax)
+            )
+        }
+        return JSONObject()
+            .put("device_scans", all.size)
+            .put("unique_ips", agg.size)
+            .put("ips_with_multiple_macs", JSONArray(agg.values.filter { it.macs.size > 1 }.map { it.ip }))
+            .put("per_device", list)
     }
 
     // ---------------- CSV ----------------
@@ -274,6 +350,8 @@ object Exporter {
         val conn = File(dir, "wlan_connection_$st.csv")
         val scan = File(dir, "wlan_scans_$st.csv")
         val ev = File(dir, "wlan_events_$st.csv")
+        val devices = File(dir, "wlan_devices_$st.csv")
+        writeCsv(snap.devices, devices, DEVICE_COLS)
         writeCsv(snap.conn, conn, CONN_COLS)
         writeCsv(snap.scan, scan, SCAN_COLS)
         ev.bufferedWriter().use { w ->
@@ -286,7 +364,7 @@ object Exporter {
                 w.write("\n")
             }
         }
-        return listOf(conn, scan, ev)
+        return listOf(conn, scan, ev, devices)
     }
 
     private fun writeCsv(src: File, dst: File, cols: List<String>) {

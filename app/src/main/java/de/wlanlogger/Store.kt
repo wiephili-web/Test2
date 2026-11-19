@@ -16,10 +16,12 @@ object Store {
     val connFile: File get() = File(dir, "connection.jsonl")
     val scanFile: File get() = File(dir, "scans.jsonl")
     val eventFile: File get() = File(dir, "events.jsonl")
+    val devicesFile: File get() = File(dir, "devices.jsonl")
 
     val connRows = AtomicLong()
     val scanRows = AtomicLong()
     val eventRows = AtomicLong()
+    val deviceRows = AtomicLong()
 
     private val lock = Any()
 
@@ -30,6 +32,7 @@ object Store {
                 connRows.set(countLines(connFile))
                 scanRows.set(countLines(scanFile))
                 eventRows.set(countLines(eventFile))
+                deviceRows.set(countLines(devicesFile))
             }
         }.start()
     }
@@ -37,6 +40,8 @@ object Store {
     fun appendConnection(o: JSONObject) = append(connFile, listOf(o), connRows)
 
     fun appendScan(rows: List<JSONObject>) = append(scanFile, rows, scanRows)
+
+    fun appendDevices(rows: List<JSONObject>) = append(devicesFile, rows, deviceRows)
 
     fun event(type: String, details: JSONObject? = null) {
         val now = System.currentTimeMillis()
@@ -58,7 +63,7 @@ object Store {
     /** Kopiert die Logdateien konsistent (unter Sperre) in [target]. */
     fun snapshotTo(target: File) {
         synchronized(lock) {
-            listOf(connFile, scanFile, eventFile).forEach { f ->
+            listOf(connFile, scanFile, eventFile, devicesFile).forEach { f ->
                 val dst = File(target, f.name)
                 if (f.exists()) f.copyTo(dst, overwrite = true) else dst.delete()
             }
@@ -67,12 +72,12 @@ object Store {
 
     fun clear() {
         synchronized(lock) {
-            listOf(connFile, scanFile, eventFile).forEach { it.delete() }
-            connRows.set(0); scanRows.set(0); eventRows.set(0)
+            listOf(connFile, scanFile, eventFile, devicesFile).forEach { it.delete() }
+            connRows.set(0); scanRows.set(0); eventRows.set(0); deviceRows.set(0)
         }
     }
 
-    fun totalBytes(): Long = listOf(connFile, scanFile, eventFile).sumOf { if (it.exists()) it.length() else 0L }
+    fun totalBytes(): Long = listOf(connFile, scanFile, eventFile, devicesFile).sumOf { if (it.exists()) it.length() else 0L }
 
     private fun countLines(f: File): Long {
         if (!f.exists()) return 0

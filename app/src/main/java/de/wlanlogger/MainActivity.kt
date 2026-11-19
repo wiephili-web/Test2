@@ -43,6 +43,8 @@ class MainActivity : Activity() {
     private lateinit var tvScan: TextView
     private lateinit var tvEvents: TextView
     private lateinit var tvStore: TextView
+    private lateinit var tvDevices: TextView
+    private lateinit var etDev: EditText
     private lateinit var etConn: EditText
     private lateinit var etScan: EditText
     private lateinit var etTarget: EditText
@@ -72,6 +74,8 @@ class MainActivity : Activity() {
         tvScan = findViewById(R.id.tvScan)
         tvEvents = findViewById(R.id.tvEvents)
         tvStore = findViewById(R.id.tvStore)
+        tvDevices = findViewById(R.id.tvDevices)
+        etDev = findViewById(R.id.etDev)
         etConn = findViewById(R.id.etConn)
         etScan = findViewById(R.id.etScan)
         etTarget = findViewById(R.id.etTarget)
@@ -82,6 +86,7 @@ class MainActivity : Activity() {
         etScan.setText(Prefs.scanInterval(this).toString())
         etTarget.setText(Prefs.pingTarget(this))
         cbPing.isChecked = Prefs.pingEnabled(this)
+        etDev.setText(Prefs.deviceInterval(this).toString())
 
         btnToggle.setOnClickListener {
             if (LiveState.running) {
@@ -93,6 +98,21 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnScan).setOnClickListener {
             withPermissions {
                 if (LiveState.running) MonitorService.scanNow(this) else oneShotScan()
+            }
+        }
+        findViewById<Button>(R.id.btnDevices).setOnClickListener {
+            if (LanScanner.busy.get()) {
+                toast("Geräte-Scan läuft bereits")
+            } else {
+                toast("Suche Geräte im Heimnetz … dauert ca. 20–60 s")
+                val app = applicationContext
+                Thread {
+                    val r = runCatching { LanScanner.runAndStore(app) }
+                    ui.post {
+                        r.onSuccess { toast("${it.size} Geräte gefunden") }
+                        r.onFailure { toast("Geräte-Scan fehlgeschlagen: ${it.message}") }
+                    }
+                }.start()
             }
         }
         findViewById<Button>(R.id.btnShareJson).setOnClickListener { exportJson(save = false) }
@@ -107,6 +127,8 @@ class MainActivity : Activity() {
                         Store.clear()
                         LiveState.lastScan = emptyList()
                         LiveState.lastConnection = null
+                        LiveState.lastDevices = emptyList()
+                        LiveState.lastDevicesTs = 0L
                         ui.post { toast("Daten gelöscht") }
                     }
                 }
@@ -138,8 +160,10 @@ class MainActivity : Activity() {
         val scan = etScan.text.toString().trim().toIntOrNull()
         if (conn == null || conn < 1) { toast("Messintervall muss ≥ 1 s sein"); return false }
         if (scan == null || scan < 5) { toast("Scan-Intervall muss ≥ 5 s sein"); return false }
+        val dev = etDev.text.toString().trim().toIntOrNull()
+        if (dev == null || dev < 0) { toast("Geräte-Scan-Intervall muss ≥ 0 sein"); return false }
         if (scan < 30) toast("Hinweis: Android lässt nur ca. 4 Scans pro 2 Minuten zu")
-        Prefs.save(this, conn, scan, etTarget.text.toString().trim(), cbPing.isChecked)
+        Prefs.save(this, conn, scan, etTarget.text.toString().trim(), cbPing.isChecked, dev)
         return true
     }
 
@@ -329,12 +353,14 @@ class MainActivity : Activity() {
         val running = LiveState.running
         btnToggle.text = if (running) "Logging stoppen" else "Logging starten"
         tvStatus.text = if (running) "● Logging läuft seit ${Util.short(LiveState.startedAt)}" else "○ Logging gestoppt"
-        listOf(etConn, etScan, etTarget, cbPing).forEach { it.isEnabled = !running }
+        listOf(etConn, etScan, etTarget, etDev, cbPing).forEach { it.isEnabled = !running }
         tvConn.text = formatConn(LiveState.lastConnection)
         tvScan.text = formatScan(LiveState.lastScan, LiveState.lastScanTs)
+        tvDevices.text = formatDevices(LiveState.lastDevices, LiveState.lastDevicesTs, LiveState.deviceProgress)
         tvEvents.text = LiveState.events().joinToString("\n").ifEmpty { "–" }
         tvStore.text = "Gespeichert: ${Store.connRows.get()} Verbindungsmessungen · " +
-            "${Store.scanRows.get()} Scan-Einträge · ${Store.eventRows.get()} Ereignisse · " +
+            "${Store.scanRows.get()} Scan-Einträge · ${Store.deviceRows.get()} Geräte-Einträge · " +
+            "${Store.eventRows.get()} Ereignisse · " +
             Util.bytes(Store.totalBytes())
     }
 
@@ -377,6 +403,38 @@ class MainActivity : Activity() {
         }
         val more = if (rows.size > MAX_SCAN_LINES) "\n… ${rows.size - MAX_SCAN_LINES} weitere" else ""
         return head + body + more + "\n(* = verbunden)"
+    }
+
+    private fun formatDevices(rows: List<JSONObject>, ts: Long, progress: String): String {
+        val sb = StringBuilder()
+        if (progress.isNotEmpty()) sb.append("⏳ ").append(progress).append("\n\n")
+        if (ts == 0L) {
+            if (progress.isEmpty()) sb.append("Noch kein Geräte-Scan – „Heimnetz-Geräte suchen“ tippen.")
+            return sb.toString()
+        }
+        sb.append("${Util.short(ts)} · ${rows.size} Geräte\n")
+        rows.forEach { r ->
+            val label = listOfNotNull(
+                if (r.isNull("role")) null else r.getString("role"),
+                if (r.isNull("type_guess")) null else r.getString("type_guess"),
+            ).joinToString(" · ").ifEmpty { "unbekannt" }
+            val name = LanScanner.displayName(r)
+            sb.append("\n").append(r.optString("ip")).append("  ").append(label).append("\n")
+            if (name.isNotEmpty()) sb.append("   ").append(name).append("\n")
+            val model = listOfNotNull(
+                if (r.isNull("upnp_manufacturer")) null else r.getString("upnp_manufacturer"),
+                if (r.isNull("upnp_model")) null else r.getString("upnp_model"),
+            ).joinToString(" ")
+            if (model.isNotEmpty()) sb.append("   ").append(model).append("\n")
+            val ping = if (r.isNull("ping_avg_ms")) "kein Ping" else
+                "Ping ${r.get("ping_avg_ms")} ms (max ${r.opt("ping_max_ms")}), Verlust ${r.opt("ping_loss_pct")} %"
+            sb.append("   ").append(ping)
+            if (!r.isNull("mac")) sb.append(" · MAC ").append(r.getString("mac"))
+            sb.append("\n")
+            val ports = r.optString("open_ports")
+            if (ports.isNotEmpty()) sb.append("   Ports ").append(ports).append("\n")
+        }
+        return sb.toString()
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()

@@ -130,20 +130,29 @@ class MonitorService : Service() {
         val scanI = Prefs.scanInterval(this).coerceAtLeast(5).toLong()
         val target = Prefs.pingTarget(this)
         val pingOn = Prefs.pingEnabled(this)
+        val devI = Prefs.deviceInterval(this).coerceAtLeast(0).toLong()
         Store.event(
             "logging_started",
             JSONObject()
                 .put("conn_interval_s", connI)
                 .put("scan_interval_s", scanI)
                 .put("ping_enabled", pingOn)
-                .put("ping_target", target),
+                .put("ping_target", target)
+                .put("device_scan_interval_min", devI),
         )
 
-        val ex = Executors.newScheduledThreadPool(2)
+        val ex = Executors.newScheduledThreadPool(3)
         exec = ex
         scanner = ScanController(this, col, ex).also { it.register() }
         ex.scheduleWithFixedDelay({ guarded("sample") { sample(col, target, pingOn) } }, 0, connI, TimeUnit.SECONDS)
         ex.scheduleWithFixedDelay({ guarded("scan") { scanner?.trigger() } }, 1, scanI, TimeUnit.SECONDS)
+        if (devI > 0) {
+            val app = applicationContext
+            ex.scheduleWithFixedDelay(
+                { guarded("devices") { if (!LanScanner.busy.get()) LanScanner.runAndStore(app) } },
+                15, devI * 60, TimeUnit.SECONDS,
+            )
+        }
     }
 
     /** Eine Exception würde sonst alle künftigen Ausführungen des Tasks stillschweigend beenden. */

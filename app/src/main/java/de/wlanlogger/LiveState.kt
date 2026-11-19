@@ -10,6 +10,9 @@ object LiveState {
     @Volatile var lastScan: List<JSONObject> = emptyList()
     @Volatile var lastScanTs = 0L
     @Volatile var lastScanStored = true
+    @Volatile var lastDevices: List<JSONObject> = emptyList()
+    @Volatile var lastDevicesTs = 0L
+    @Volatile var deviceProgress = ""
 
     private val events = ArrayList<String>()
 

@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- mDNS/SSDP-Gerätesuche im Heimnetz -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Ping (ICMP) braucht Netzwerkzugriff -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android gibt Scanergebnisse/SSID/BSSID nur mit Standortberechtigung heraus -->
@@ -22,7 +24,8 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.Material.Light.DarkActionBar">
+        android:theme="@android:style/Theme.Material.Light.DarkActionBar"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
